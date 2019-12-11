@@ -12,16 +12,42 @@ var hogan = require('hogan-express');
 var session = require('express-session');
 var passport = require('passport');
 
-function initialize(config) {
+var fs = require('fs');
+var http = require('http');
+var https = require('https');
+var defaultPort = 3000;
 
+function initSSL(app) {
+  var privateKey = fs.readFileSync('app/ssl/2_qianzhao.online.key', 'utf8');
+  var certificate = fs.readFileSync('app/ssl/1_qianzhao.online_bundle.crt', 'utf8');
+  var credentials = {
+    key: privateKey,
+    cert: certificate
+  };
+
+  var httpServer = http.createServer(app);
+  var httpsServer = https.createServer(credentials, app);
+  httpServer.listen(process.env.PORT || defaultPort, function () {
+    console.log('HTTP Server is running on: http://localhost:%s', process.env.PORT || defaultPort);
+  });
+  httpsServer.listen(443, function () {
+    console.log('HTTPS Server is running on: https://localhost:%s', 443);
+  });
+}
+
+function initialize(config) {
   // Load Translations
-  if (!config.locale) { config.locale = 'en'; }
+  if (!config.locale) {
+    config.locale = 'en';
+  }
   if (!config.lang) {
     config.lang = require('./translations/' + config.locale + '.json');
   }
 
   // Content_Dir requires trailing slash
-  if (config.content_dir[config.content_dir.length - 1] !== path.sep) { config.content_dir += path.sep; }
+  if (config.content_dir[config.content_dir.length - 1] !== path.sep) {
+    config.content_dir += path.sep;
+  }
 
   // Load Files
   var authenticate = require('./middleware/authenticate.js')(config);
@@ -43,18 +69,25 @@ function initialize(config) {
 
   // New Express App
   var app = express();
+  initSSL(app);
   var router = express.Router();
 
   // Setup Port
-  app.set('port', process.env.PORT || 80);
+  // app.set('port', process.env.PORT || defaultPort);
 
   // set locale as date and time format
   moment.locale(config.locale);
 
   // Setup Views
-  if (!config.theme_dir) { config.theme_dir = path.join(__dirname, '..', 'themes'); }
-  if (!config.theme_name) { config.theme_name = 'default'; }
-  if (!config.public_dir) { config.public_dir = path.join(config.theme_dir, config.theme_name, 'public'); }
+  if (!config.theme_dir) {
+    config.theme_dir = path.join(__dirname, '..', 'themes');
+  }
+  if (!config.theme_name) {
+    config.theme_name = 'default';
+  }
+  if (!config.public_dir) {
+    config.public_dir = path.join(config.theme_dir, config.theme_name, 'public');
+  }
   app.set('views', path.join(config.theme_dir, config.theme_name, 'templates'));
   app.set('layout', 'layout');
   app.set('view engine', 'html');
@@ -65,7 +98,9 @@ function initialize(config) {
   app.use(favicon(config.public_dir + '/favicon.ico'));
   app.use(logger('dev'));
   app.use(body_parser.json());
-  app.use(body_parser.urlencoded({ extended: false }));
+  app.use(body_parser.urlencoded({
+    extended: false
+  }));
   app.use(cookie_parser());
   app.use(express.static(config.public_dir));
   if (config.theme_dir !== path.join(__dirname, '..', 'themes')) {
